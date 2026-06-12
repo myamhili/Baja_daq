@@ -1,10 +1,11 @@
 # Baja SAE Central Data Acquisition (DAQ) Node
 
-A custom, ruggedized telemetry and data logging PCB engineered for an off-road Baja SAE racing vehicle. 
+A custom, ruggedized telemetry and data logging PCB engineered for the University of Waterloo Baja SAE racing vehicle. 
 
-Unlike standard microcontroller breakout boards, this DAQ node is designed to survive the harsh electrical and mechanical environment of an automotive chassis. It features a 4-layer load-dump protected layout, dedicated hardware for high-speed logging, and CAN bus communication.
+Unlike standard microcontroller breakout boards, this DAQ node is designed to survive the harsh electrical and mechanical environment of an automotive chassis. It features a 4-layer load-dump protected layout, dedicated hardware for high-speed logging, and a real-time FreeRTOS firmware architecture.
 
-## ⚙️ Core Architecture
+
+## ⚙️ Hardware Architecture
 * **Microcontroller:** STM32F405RGTx (ARM Cortex-M4) handling real-time sensor polling and SDIO data pipelines.
 * **PCB Stackup:** 4-Layer board (Signal, Solid Ground, Split Power, Signal) optimized for signal integrity, return paths, and thermal dissipation.
 
@@ -15,12 +16,15 @@ The board interfaces directly with the vehicle's 12V starter battery and is hard
 * **Digital Rail (3.3V):** AMS1117 LDO isolated with dedicated bulk tantalum/ceramic decoupling arrays to prevent STM32 brownouts under severe chassis vibration.
 
 ## 📡 Sensor & Communication Interfaces
-* **Vehicle Network:** Isolated CAN Bus (TJA1051T transceiver) with an 8MHz external crystal for precision timing.
+* **Vehicle Network:** CAN Bus (TJA1051T transceiver) acting as a non-blocking broadcast node for dashboard telemetry, timed via an 8MHz external crystal.
 * **Inertial Tracking:** On-board 6-axis IMU (ISM330DHCX) communicating via high-speed SPI.
-* **Telemetry Logging:** MicroSD card slot wired via 4-bit SDIO with 47k pull-up stability arrays.
-* **External I/O (Locking Molex Connectors):** * Front & Rear Suspension Travel (ADC)
-    * Engine & Secondary CVT RPM (Hardware Timers)
-    * I2C Temperature Probes
+* **Telemetry Logging:** MicroSD card slot wired via 4-bit SDIO with 47k pull-up stability arrays for reliable 100Hz writes.
+* **External I/O (Locking Molex Connectors):** * Front & Rear Suspension Travel (Generic 3-pin ADC)
+    * Engine & Secondary CVT RPM (Hardware Timers / Input Capture)
+    * Belt Temperature Probes (I2C)
 
-## 🛠️ Viewing the Project
-To view the schematic and physical layout, open `baja_daq.kicad_pro` using KiCad 10.0 or newer.
+## 💻 Firmware Design (FreeRTOS)
+The system runs a custom C firmware utilizing the STM32 HAL and CMSIS-RTOS.
+* **Decoupled Logging:** A high-priority sensor task handles SPI/I2C polling and mathematically derives ground speed from timer deltas. Data is formatted and pushed to a FreeRTOS queue.
+* **Non-Blocking File I/O:** A lower-priority FatFs SD Writer task pulls from the queue to write to the MicroSD card, ensuring that standard file-system latency does not freeze the 100Hz real-time data gathering loop.
+* **Data Protection:** Implements an automated 15-minute file rotation state machine to prevent total file corruption in the event of a sudden power loss or rollover.
