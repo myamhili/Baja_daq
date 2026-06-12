@@ -4,8 +4,9 @@ A custom, ruggedized telemetry and data logging PCB engineered for the Universit
 
 Unlike standard microcontroller breakout boards, this DAQ node is designed to survive the harsh electrical and mechanical environment of an automotive chassis. It features a 4-layer load-dump protected layout, dedicated hardware for high-speed logging, and a real-time FreeRTOS firmware architecture.
 
-<img width="2520" height="1208" alt="baja_daq" src="https://github.com/user-attachments/assets/5fe6d880-6201-4fe8-8e1d-188c32d673f5" />
-<img width="2876" height="1798" alt="baja_daq_pcb" src="https://github.com/user-attachments/assets/f7822d8c-2ddd-4e3f-91a9-4e3bd00235ac" />
+<img width="2532" height="1220" alt="baja_daq" src="https://github.com/user-attachments/assets/62324116-9a9a-496e-b6cf-bb6c08770bfe" />
+<img width="2880" height="1800" alt="baja_daq_pcb" src="https://github.com/user-attachments/assets/74c030be-7f83-489f-bfa0-36d649f5ce5a" />
+
 
 
 
