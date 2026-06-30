@@ -6,6 +6,8 @@ Unlike standard microcontroller breakout boards, this DAQ node is designed to su
 
 <img width="2520" height="1208" alt="baja_daq" src="https://github.com/user-attachments/assets/908fbbb0-38d3-4c7e-af37-8a5154cd2bff" />
 <img width="2880" height="1800" alt="image" src="https://github.com/user-attachments/assets/94d59bee-c6a2-439d-994c-aac49caae539" />
+<img width="932" height="800" alt="bajafirmwarepic" src="https://github.com/user-attachments/assets/9923cc9a-0ab1-46d6-89db-76a6d06c8913" />
+
 
 
 
