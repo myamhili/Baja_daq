@@ -1,0 +1,22 @@
+# STM32CubeIDE/MX files
+.mxproject
+
+# IAR Embedded Workbench project files
+firmware/baja/EWARM/*.ewd
+firmware/baja/EWARM/*.ewp
+firmware/baja/EWARM/*.eww
+firmware/baja/EWARM/*.icf
+firmware/baja/EWARM/*.s
+
+# Build artifacts
+*.o
+*.d
+*.su
+*.elf
+*.map
+*.bin
+*.hex
+*.lst
+Debug/
+Release/
+build/
