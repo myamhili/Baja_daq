@@ -20,3 +20,11 @@ firmware/baja/EWARM/*.s
 Debug/
 Release/
 build/
+
+# Local analysis/temp files
+tmp_pdf_extracts/
+**/tmp_pdf_extracts/
+
+# KiCad/editor history
+.history/
+**/.history/

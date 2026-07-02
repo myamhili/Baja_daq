@@ -1,6 +1,11 @@
+#include "main.h"
+
 void Task_DataGathering(void const * argument) {
     float engine_rpm, secondary_rpm, ground_speed, belt_temp;
     int16_t imu_roll, imu_pitch, imu_z_gforce; 
+    char txRecord[sizeof(csvBuffer)];
+
+    (void)argument;
     
     for(;;) {
         // 1. Calculate Speeds
@@ -21,15 +26,14 @@ void Task_DataGathering(void const * argument) {
         int32_t susp_rr_delta = adc_buffer[1] - susp_zero_rear_rt;
         
         // 4. Format CSV
-        snprintf(csvBuffer, sizeof(csvBuffer), 
-                 "%.1f,%.1f,%.1f,%.1f,%d,%d,%d,%ld,%ld
-",
+        snprintf(txRecord, sizeof(txRecord),
+                 "%.1f,%.1f,%.1f,%.1f,%d,%d,%d,%ld,%ld\r\n",
                  engine_rpm, secondary_rpm, ground_speed, belt_temp,
                  imu_roll, imu_pitch, imu_z_gforce,
                  susp_fr_delta, susp_rr_delta);
                  
         // 5. Push to SD Queue
-        xQueueSend(csvDataQueue, &csvBuffer, pdMS_TO_TICKS(2));
+        xQueueSend(csvDataQueue, txRecord, pdMS_TO_TICKS(2));
         
         // 6. Pack and Transmit CAN Frame
         uint16_t rpm_int = (uint16_t)engine_rpm;
@@ -54,5 +58,8 @@ void Task_DataGathering(void const * argument) {
 
         // 7. Strict 10ms Delay Loop
         vTaskDelay(pdMS_TO_TICKS(10));
+
+        // 8. Pet the watchdog
+        HAL_IWDG_Refresh(&hiwdg);
     }
 }

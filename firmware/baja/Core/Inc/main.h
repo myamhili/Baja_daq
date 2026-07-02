@@ -32,7 +32,8 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "cmsis_os.h"
-#include "fatfs.h"
+#include "FreeRTOS.h"
+#include "queue.h"
 #include <stdio.h>
 #include <string.h>
 /* USER CODE END Includes */
@@ -45,7 +46,6 @@ extern "C" {
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
 // --- Vehicle & Hardware Constants ---
-#define TIMER_FREQ_HZ         84000000.0f  // 84MHz APB timer clock
 #define ENGINE_PPR            2.0f         // Pulses Per Revolution
 #define SECONDARY_PPR         4.0f         
 #define GEARBOX_RATIO         8.5f         
@@ -53,6 +53,7 @@ extern "C" {
 #define BELT_TEMP_LIMIT_C     88.0f        
 #define ENGINE_START_RPM      800.0f       
 #define FILE_ROTATION_MS      900000
+#define CSV_QUEUE_DEPTH       32U
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/
@@ -66,6 +67,30 @@ void Error_Handler(void);
 /* USER CODE BEGIN EFP */
 void Init_CAN_Broadcast(void);
 void Calibrate_Suspension_Zeros(void);
+void Start_Timing_Inputs(void);
+float Calculate_RPM(uint32_t delta_ticks, float ppr);
+float Calculate_Ground_Speed_KMH(float secondary_rpm);
+float Read_MLX90614_Temp(void);
+void Read_ISM330DHCX_IMU(int16_t *roll, int16_t *pitch, int16_t *z_gforce);
+
+extern ADC_HandleTypeDef hadc1;
+extern CAN_HandleTypeDef hcan1;
+extern IWDG_HandleTypeDef hiwdg;
+extern SD_HandleTypeDef hsd;
+extern TIM_HandleTypeDef htim5;
+extern DMA_HandleTypeDef hdma_adc1;
+extern DMA_HandleTypeDef hdma_sdio_rx;
+extern DMA_HandleTypeDef hdma_sdio_tx;
+extern QueueHandle_t csvDataQueue;
+extern char csvBuffer[128];
+extern uint16_t adc_buffer[2];
+extern uint32_t susp_zero_front_rt;
+extern uint32_t susp_zero_rear_rt;
+extern volatile uint32_t engine_delta_ticks;
+extern volatile uint32_t secondary_delta_ticks;
+extern CAN_TxHeaderTypeDef TxHeader;
+extern uint32_t TxMailbox;
+extern uint8_t TxData[8];
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

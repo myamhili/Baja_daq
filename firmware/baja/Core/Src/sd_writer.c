@@ -1,3 +1,6 @@
+#include "main.h"
+#include "fatfs.h"
+
 void Task_SDWriter(void const * argument) {
     FATFS fs;
     FIL file;
@@ -6,13 +9,18 @@ void Task_SDWriter(void const * argument) {
     uint16_t file_index = 1;
     uint8_t is_logging = 0;
     uint32_t file_open_time = 0;
+    FRESULT result;
+
+    (void)argument;
     
-    // FatFs utilizes the SDIO peripheral automatically
-    f_mount(&fs, "", 1);
+    result = f_mount(&fs, "", 1);
+    if (result != FR_OK) {
+        Error_Handler();
+    }
 
     for(;;) {
         // Block until data is available in the queue
-        if (xQueueReceive(csvDataQueue, &rxBuffer, portMAX_DELAY) == pdPASS) {
+        if (xQueueReceive(csvDataQueue, rxBuffer, pdMS_TO_TICKS(1000)) == pdPASS) {
             
             float current_engine_rpm;
             sscanf(rxBuffer, "%f", &current_engine_rpm);
@@ -21,8 +29,7 @@ void Task_SDWriter(void const * argument) {
             if (!is_logging && current_engine_rpm > ENGINE_START_RPM) {
                 snprintf(filename, sizeof(filename), "RUN_%03d.CSV", file_index);
                 if (f_open(&file, filename, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
-                    f_puts("Eng_RPM,Sec_RPM,Speed_KMH,Belt_C,Roll,Pitch,Z_G,Susp_FR,Susp_RR
-", &file);
+                    f_puts("Eng_RPM,Sec_RPM,Speed_KMH,Belt_C,Roll,Pitch,Z_G,Susp_FR,Susp_RR\r\n", &file);
                     is_logging = 1;
                     file_open_time = HAL_GetTick();
                 }
@@ -53,6 +60,8 @@ void Task_SDWriter(void const * argument) {
                     sync_counter = 0;
                 }
             }
+        } else {
+            HAL_IWDG_Refresh(&hiwdg);
         }
     }
 }
