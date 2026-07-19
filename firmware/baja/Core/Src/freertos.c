@@ -24,15 +24,11 @@
 #include "cmsis_os.h"
 #include "monitoring.h"
 
-osThreadId defaultTaskHandle;
 osThreadId dataGatheringTaskHandle;
-osThreadId mathProcessingTaskHandle;
 osThreadId sdWriterTaskHandle;
 osThreadId stackWatermarkTaskHandle;
 
-void StartDefaultTask(void const * argument);
 void Task_DataGathering(void const * argument);
-void Task_MathProcessing(void const * argument);
 void Task_SDWriter(void const * argument);
 void Task_StackWatermark(void const * argument);
 
@@ -76,14 +72,8 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer,
 
 void MX_FREERTOS_Init(void)
 {
-  csvDataQueue = xQueueCreate(CSV_QUEUE_DEPTH, sizeof(csvBuffer));
+  csvDataQueue = xQueueCreate(CSV_QUEUE_DEPTH, sizeof(data_record_t));
   if (csvDataQueue == NULL) {
-    Error_Handler();
-  }
-
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
-  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
-  if (defaultTaskHandle == NULL) {
     Error_Handler();
   }
 
@@ -93,31 +83,15 @@ void MX_FREERTOS_Init(void)
     Error_Handler();
   }
 
-  osThreadDef(mathProcessingTask, Task_MathProcessing, osPriorityNormal, 0, 256);
-  mathProcessingTaskHandle = osThreadCreate(osThread(mathProcessingTask), NULL);
-  if (mathProcessingTaskHandle == NULL) {
-    Error_Handler();
-  }
-
   osThreadDef(sdWriterTask, Task_SDWriter, osPriorityBelowNormal, 0, 1024);
   sdWriterTaskHandle = osThreadCreate(osThread(sdWriterTask), NULL);
   if (sdWriterTaskHandle == NULL) {
     Error_Handler();
   }
 
-  osThreadDef(stackWatermarkTask, Task_StackWatermark, osPriorityLow, 0, 256);
+  osThreadDef(stackWatermarkTask, Task_StackWatermark, osPriorityNormal, 0, 256);
   stackWatermarkTaskHandle = osThreadCreate(osThread(stackWatermarkTask), NULL);
   if (stackWatermarkTaskHandle == NULL) {
     Error_Handler();
-  }
-}
-
-void StartDefaultTask(void const * argument)
-{
-  (void)argument;
-
-  for(;;)
-  {
-    osDelay(1);
   }
 }

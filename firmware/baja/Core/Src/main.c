@@ -29,6 +29,7 @@
 #include "spi.h"
 #include "tim.h"
 #include "gpio.h"
+#include "diagnostics.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -55,16 +56,19 @@
 /* USER CODE BEGIN PV */
 // --- FreeRTOS Globals ---
 QueueHandle_t csvDataQueue;
-char csvBuffer[128];
 
-uint16_t adc_buffer[2];          // DMA buffer for 2 analog channels
+volatile uint16_t adc_buffer[2]; // DMA buffer for 2 analog channels
 uint32_t susp_zero_front_rt = 0;
 uint32_t susp_zero_rear_rt = 0;
 
 volatile uint32_t engine_delta_ticks = 0;
 volatile uint32_t secondary_delta_ticks = 0;
+volatile uint32_t engine_last_pulse_ms = 0;
+volatile uint32_t secondary_last_pulse_ms = 0;
 static volatile uint32_t engine_last_capture = 0;
 static volatile uint32_t secondary_last_capture = 0;
+static volatile uint8_t engine_capture_valid = 0;
+static volatile uint8_t secondary_capture_valid = 0;
 
 // --- CAN Globals ---
 CAN_TxHeaderTypeDef TxHeader;
@@ -83,28 +87,12 @@ void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN 0 */
 // --- Initialization Functions ---
 void Init_CAN_Broadcast(void) {
-    CAN_FilterTypeDef canfilterconfig;
-    
-    // Setup a wide-open filter (required to start the bxCAN module)
-    canfilterconfig.FilterActivation = CAN_FILTER_ENABLE;
-    canfilterconfig.FilterBank = 0;
-    canfilterconfig.FilterFIFOAssignment = CAN_RX_FIFO0;
-    canfilterconfig.FilterIdHigh = 0x0000;
-    canfilterconfig.FilterIdLow = 0x0000;
-    canfilterconfig.FilterMaskIdHigh = 0x0000;
-    canfilterconfig.FilterMaskIdLow = 0x0000;
-    canfilterconfig.FilterMode = CAN_FILTERMODE_IDMASK;
-    canfilterconfig.FilterScale = CAN_FILTERSCALE_32BIT;
-    canfilterconfig.SlaveStartFilterBank = 14; 
-
-    HAL_CAN_ConfigFilter(&hcan1, &canfilterconfig);
-    HAL_CAN_Start(&hcan1);
-    HAL_CAN_ActivateNotification(&hcan1,
-                                  CAN_IT_RX_FIFO0_MSG_PENDING |
-                                  CAN_IT_RX_FIFO0_FULL |
-                                  CAN_IT_RX_FIFO0_OVERRUN |
-                                  CAN_IT_ERROR |
-                                  CAN_IT_BUSOFF);
+    if (HAL_CAN_Start(&hcan1) != HAL_OK ||
+        HAL_CAN_ActivateNotification(&hcan1,
+                                     CAN_IT_ERROR |
+                                     CAN_IT_BUSOFF) != HAL_OK) {
+        Error_Handler();
+    }
 
     // Pre-configure the Transmission Header
     TxHeader.StdId = 0x100;           
@@ -117,12 +105,21 @@ void Init_CAN_Broadcast(void) {
 
 // Called once in main() before FreeRTOS scheduler starts
 void Calibrate_Suspension_Zeros(void) {
+    uint32_t front_sum = 0U;
+    uint32_t rear_sum = 0U;
+    uint32_t sample;
+
     if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, 2) != HAL_OK) {
         Error_Handler();
     }
-    HAL_Delay(10); 
-    susp_zero_front_rt = adc_buffer[0];
-    susp_zero_rear_rt = adc_buffer[1];
+    HAL_Delay(10);
+    for (sample = 0U; sample < 32U; sample++) {
+        front_sum += adc_buffer[0];
+        rear_sum += adc_buffer[1];
+        HAL_Delay(1);
+    }
+    susp_zero_front_rt = front_sum / 32U;
+    susp_zero_rear_rt = rear_sum / 32U;
 }
 
 void Start_Timing_Inputs(void) {
@@ -256,24 +253,20 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 
   if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) {
     capture = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
-    engine_delta_ticks = capture - engine_last_capture;
+    if (engine_capture_valid != 0U) {
+      engine_delta_ticks = capture - engine_last_capture;
+    }
     engine_last_capture = capture;
+    engine_last_pulse_ms = HAL_GetTick();
+    engine_capture_valid = 1U;
   } else if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2) {
     capture = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);
-    secondary_delta_ticks = capture - secondary_last_capture;
-    secondary_last_capture = capture;
-  }
-}
-
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
-{
-  CAN_RxHeaderTypeDef rxHeader;
-  uint8_t rxData[8];
-
-  while (HAL_CAN_GetRxFifoFillLevel(hcan, CAN_RX_FIFO0) > 0U) {
-    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, rxData) != HAL_OK) {
-      break;
+    if (secondary_capture_valid != 0U) {
+      secondary_delta_ticks = capture - secondary_last_capture;
     }
+    secondary_last_capture = capture;
+    secondary_last_pulse_ms = HAL_GetTick();
+    secondary_capture_valid = 1U;
   }
 }
 
@@ -282,12 +275,10 @@ void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan)
   uint32_t error = HAL_CAN_GetError(hcan);
 
   if ((error & HAL_CAN_ERROR_BOF) != 0U) {
+    g_diagnostics.can_bus_offs++;
     HAL_CAN_Stop(hcan);
     HAL_CAN_Start(hcan);
     HAL_CAN_ActivateNotification(hcan,
-                                  CAN_IT_RX_FIFO0_MSG_PENDING |
-                                  CAN_IT_RX_FIFO0_FULL |
-                                  CAN_IT_RX_FIFO0_OVERRUN |
                                   CAN_IT_ERROR |
                                   CAN_IT_BUSOFF);
   }
